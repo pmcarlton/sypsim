@@ -39,13 +39,18 @@
 #define PLKMAX 3 //matrix values can be between 0 and this level...start small
 #define PP1MAX 3
 #define SYPMAX 3
+#define KON_BASE 1.0
 
 //triggers for things at a certain run number:
+#define PP1RUN 500
+#define PP1END 5000
 #define PLKRUN 500 //when does PLK-2 start working
 #define PLKEND 5000
+#define PHOSGEN 0.3
 #define COPHOSRUN 1000 //when does SYP-1 phos at CO start
 #define COPHOSEND 2850
 #define RUNMAX 10000 //when does program end
+#define MAXPLACETRIES 10 //how many times a SYP tries to get on the SC before giving up
 
 #define IMGWIDTH 800
 #define IMGSPACING 50
@@ -66,6 +71,9 @@ void plk_step  (int xs[ROWS][QUANTUM]);
 void pp1_step  (int xs[ROWS][QUANTUM]); 
 int  syp_place (int xs[ROWS][QUANTUM]); 
 int  syp_step (int xs[ROWS][QUANTUM]); 
+float get_stickyprob(int plk);
+float get_offprob(int plk);
+
 /************************************************************************
  * Global vars
  ***********************************************************************/
@@ -76,7 +84,7 @@ int run;
  * other functions
  * *************************/
 
-int syp_place(int* xs) {
+int syp_place(int xs[ROWS][QUANTUM]) {
     int li;
     int tries=0;
     int phos;
@@ -84,8 +92,8 @@ int syp_place(int* xs) {
     phos=((rnd<PHOSGEN)?0:1);
     while(successflag | (tries>=MAXPLACETRIES)) {
         li=(int)(rnd*(QUANTUM)); //position of placement -- totally random for now
-        if(syp[SYPP][li]+syp[SYPN][li] < SYPMAX) {
-        syp[phos][li]++;
+        if(xs[SYPP][li]+xs[SYPN][li] < SYPMAX) {
+        xs[phos][li]++;
         successflag=0;
         }
         tries++;
@@ -93,7 +101,7 @@ int syp_place(int* xs) {
     return(0==successflag); //returns 1 if successfully placed, 0 if unsuccessful
 }
    
-void pp1_step(int* xs) {
+void pp1_step(int xs[ROWS][QUANTUM]) {
     int li;
     for (li=0;li<QUANTUM;li++) {
         xs[PP1L][li]++;
@@ -108,7 +116,7 @@ void pp1_step(int* xs) {
     }
 } 
 
-void plk_step(int* xs) {
+void plk_step(int xs[ROWS][QUANTUM]) {
     int li;
     for (li=0;li<QUANTUM;li++) {
         xs[PLKL][li]+=xs[SYPP][li];
@@ -122,6 +130,9 @@ void plk_step(int* xs) {
     }
 }
 
+float get_offprob(int plk) {
+return(1.0/(20.0+plk*2));
+}
 /************************************************************************
  * Main function
  ***********************************************************************/
@@ -132,9 +143,10 @@ main (int argc, char **argv)
   int initsyps = 300;
   int syptotal = 0;
   int syp_add = 1;
-  int li, li2;
+  int li, li2, bound_syps, free_syps, free_reg;
   int xs[ROWS][QUANTUM]; //the chromosome data
   int xsu[ROWS][QUANTUM];//copy of the data for updating
+  float prob;
 
   gdImagePtr kymo;
 
@@ -176,7 +188,7 @@ main (int argc, char **argv)
       }
 
 
-      writekymorow(syps, nsyps_current, kymo, plk);
+    writekymorow(syps, nsyps_current, kymo, plk);
     }
  writeimage (syps, nsyps_current);
  writekymopng(kymo);
@@ -185,9 +197,56 @@ main (int argc, char **argv)
 }
 
 int syp_step(int xs[ROWS][QUANTUM]) {
+int li,li2,syp,acc,r,i;
+int xs2[ROWS][QUANTUM];
+float off,stay,sticky,lateral,test;
 
+xs_zero(xs2);
 
+for (li=0;li<QUANTUM;li++) {
+    for(r=0;r<2;r++) {
+    syp=xs[r][li];
+    if(syp) { 
+        for (i=0;i<syp;i++) {
+            off=get_offprob(xs[PLKL][li]);
+            stay=1-off;
+            sticky=stay*get_stickyprob(xs[PLKL][li]);
+            lateral=(stay-sticky);
+            test=rnd;
+            if(test<lateral) { // move left or right
+                 li2=(rnd<0.5?li+1:li-1); //equal prob. of left or right
+                 if((li2==CO) | (li2<0) | (li2==QUANTUM)) {li2=li;} //forbidden moves
+            xs2[r][li2]++;
+              } 
+            else if (test<stay) { xs2[r][li]++; }//stay in center
+        }
+    }
+    }
 }
+
+//re-make xs from xs2
+for(li=0;li<ROWS;li++) {
+    for (li2=0;li2<QUANTUM;li2++) {
+        xs[li][li2]=xs2[li][li2];
+    }
+}
+
+//sum up at the end:
+acc=0;
+for (li=0;li<QUANTUM;li++) {
+acc += xs[SYPP][li];
+acc += xs[SYPN][li];
+}
+
+return(acc);
+}
+
+
+
+float get_stickyprob(int plk) {
+return(1.0/(2+plk));
+}
+
 /* zero out an 'xs' matrix */
 void xs_zero (int xs[ROWS][QUANTUM]) {
     int li, li2;

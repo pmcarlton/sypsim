@@ -18,6 +18,7 @@
  *
  * 20190129 -- seems to be working functionally now, but need to find 
  *          parameters that can work or else this model is crap
+ *          ...also still no sure things are werkin lit they shoud
  *
  ***********************************************************************/
 
@@ -31,18 +32,18 @@
 #define PPIND 9
 #define IMGWIDTH 800
 #define IMGSPACING 50
-#define CO 0.55
+#define CO 0.25
 #define STEPNUMERATOR 10.0
 #define QUANTUM 200
 #define SYPMAX 1000
 #define PLKUP 1.00
-#define PLKDOWN 0.0005
+#define PLKDOWN 0.05
 #define PLKLEAVEMOD 100
-#define PLKMAX 80
+#define PLKMAX 60
 #define PLKRUN 500
 #define COPHOSRUN 1000
 #define COPHOSEND 2850
-#define RUNMAX 15000
+#define RUNMAX 14800
 #define rnd ( (0.0 + rand() ) / (RAND_MAX + 1.0) )
 
 
@@ -115,7 +116,7 @@ main (int argc, char **argv)
   ppmat[4] = 1;        //free nonphos - phos if gt
   ppmat[5] = 1;         //near-CO phos - dephos if gt
   ppmat[6] = 0;         //near-CO nonphos - phos if gt
-  ppmat[7] = 0.99; //other bound phos - dephos if gt
+  ppmat[7] = .99; //other bound phos - dephos if gt
   ppmat[8] = 1;         //other bound nonphos - phos if gt
 
 for (li=0;li<QUANTUM;li++) {plk[li]=0;} // initialize PLK with zeros
