@@ -24,7 +24,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
-#include "gd.h"
 #include <unistd.h>
 
 
@@ -36,24 +35,23 @@
 #define PP1L 3 //row 3 for PP1 level
 #define QUANTUM 200 //number of columns in the xs matrix
 #define CO 50 //crossover position; TODO need way for multiple COs
-#define PLKMAX 3 //matrix values can be between 0 and this level...start small
-#define PP1MAX 3
-#define SYPMAX 3
+#define PLKMAX 30 //matrix values can be between 0 and this level...start small
+#define PP1MAX 30
+#define SYPMAX 30
+#define POOLMAX 1000
+#define INITSYPS 500
 #define KON_BASE 1.0
 
 //triggers for things at a certain run number:
 #define PP1RUN 500
 #define PP1END 5000
 #define PLKRUN 500 //when does PLK-2 start working
-#define PLKEND 5000
-#define PHOSGEN 0.3
+#define PLKEND 10000
+#define PHOSGEN 0.2
 #define COPHOSRUN 1000 //when does SYP-1 phos at CO start
-#define COPHOSEND 2850
+#define COPHOSEND 8850
 #define RUNMAX 10000 //when does program end
-#define MAXPLACETRIES 10 //how many times a SYP tries to get on the SC before giving up
-
-#define IMGWIDTH 800
-#define IMGSPACING 50
+#define MAXPLACETRIES 20 //how many times a SYP tries to get on the SC before giving up
 
 #define rnd ( (0.0 + rand() ) / (RAND_MAX + 1.0) )
 
@@ -62,9 +60,7 @@
  * Internal function declarations
  ***********************************************************************/
 
-void writeimage(syp_t *syps, int nsyps_current); 
-void writekymorow(syp_t *syps, int nsyps_current, gdImagePtr kymo, int xs[ROWS][QUANTUM]); 
-void writekymopng(gdImagePtr kymo); 
+void writekymorow(int xs[ROWS][QUANTUM]); 
 void print_ppmat (); 
 void xs_zero (int xs[ROWS][QUANTUM]); 
 void plk_step  (int xs[ROWS][QUANTUM]); 
@@ -113,6 +109,7 @@ void pp1_step(int xs[ROWS][QUANTUM]) {
         if(xs[PP1L][li]>PP1MAX) {
             xs[PP1L][li]=PP1MAX;
         }
+        xs[PP1L][li]=3;
     }
 } 
 
@@ -140,7 +137,7 @@ int
 main (int argc, char **argv)
 {
   int nsyps_current = 0;
-  int initsyps = 300;
+  int initsyps = INITSYPS;
   int syptotal = 0;
   int syp_add = 1;
   int li, li2, bound_syps, free_syps, free_reg;
@@ -148,12 +145,9 @@ main (int argc, char **argv)
   int xsu[ROWS][QUANTUM];//copy of the data for updating
   float prob;
 
-  gdImagePtr kymo;
 
   srand (time (NULL));
 
-  kymo = gdImageCreate(4*IMGWIDTH+3*IMGSPACING+QUANTUM, RUNMAX);
- 
   xs_zero(xs);  //zero out the two XS-containing matrices
   xs_zero(xsu);
 
@@ -173,11 +167,15 @@ main (int argc, char **argv)
       // go through "free" pool of SYPs and place on the SC 
       // probability of placing should be proportional to concentration
 
+    if(syptotal<POOLMAX) {
+        syptotal=syptotal+syp_place(xs); //syp keeps growing throughout prophase
+    }
+
       bound_syps = syp_step(xs); //TODO syp_step, sum up all bound syps@end and return
       free_syps = syptotal-bound_syps;
       free_reg = free_syps;
 
-      prob=KON_BASE*(float)((free_reg+0.0)/(SYPMAX));
+      prob=KON_BASE*(float)((free_reg+0.0)/(POOLMAX));
 
       for (li=0;li<free_reg;li++) {
           if(rnd<prob) {
@@ -187,14 +185,22 @@ main (int argc, char **argv)
           }
       }
 
-
-    writekymorow(syps, nsyps_current, kymo, plk);
+    writekymorow(xs);
     }
- writeimage (syps, nsyps_current);
- writekymopng(kymo);
 
  return (0);
 }
+
+void writekymorow(int xs[ROWS][QUANTUM]) {
+int li,li2;
+for(li=0;li<ROWS;li++) {
+    for(li2=0;li2<QUANTUM;li2++) {
+        printf("%i ",xs[li][li2]);
+    }
+}
+printf("\n");
+}
+
 
 int syp_step(int xs[ROWS][QUANTUM]) {
 int li,li2,syp,acc,r,i;
@@ -225,7 +231,7 @@ for (li=0;li<QUANTUM;li++) {
 }
 
 //re-make xs from xs2
-for(li=0;li<ROWS;li++) {
+for(li=0;li<2;li++) {
     for (li2=0;li2<QUANTUM;li2++) {
         xs[li][li2]=xs2[li][li2];
     }
@@ -255,75 +261,3 @@ for (li2=0;li2<QUANTUM;li2++) {xs[li][li2]=0;} // initialize chromosome with zer
 }
 }
 
-void writekymopng(gdImagePtr kymo) {
-  char pngfilename[120];
-  FILE *pngout;
-
-  sprintf(pngfilename,"kymo.png");
-  pngout = fopen(pngfilename, "wb");
-
-  /* Output the image to the disk file in PNG format. */
-  gdImagePng(kymo, pngout);
-
-  /* Close the files. */
-  fclose(pngout);
-
-  /* Destroy the image in memory. */
-  gdImageDestroy(kymo);
-
-}
-
-void writeimage(syp_t *syps, int nsyps_current) {
-    static int imgnum=0;
-    int li;
-    int px;
-  /* Declare the image */
-  gdImagePtr im;
-  /* Declare output files */
-  FILE *pngout;
-  /* Declare color indexes */
-  int white;
-  int black;
-  int green;
-  int magenta;
-  char pngfilename[120];
-
-  imgnum+=1;
-  /* Allocate the image: IMGWIDTH pixels across by 64 pixels tall */
-  im = gdImageCreate(IMGWIDTH, 64);
-
-  /* Allocate the color black (red, green and blue all minimum).
-    Since this is the first color in a new image, it will
-    be the background color. */
-  black = gdImageColorAllocate(im, 0, 0, 0);
-  white = gdImageColorAllocate(im, 255, 255, 255);
-  magenta = gdImageColorAllocate(im, 255, 0, 255);
-  green = gdImageColorAllocate(im, 0, 255, 0);
-
-
-for (li=0;li<nsyps_current;li++) {
-    if(syps[li].pos > 0) {
-    px=(IMGWIDTH*syps[li].pos);
-    if(syps[li].phos) {
-    gdImageLine(im, px, 0, px, 64, green); //SYP-1-phos is green
-    } else {
-        gdImageLine(im,px,0,px,64,magenta); //SYP-1-np is magenta
-    }
-    }
-}
-
-  /* Open a file for writing. "wb" means "write binary", important
-    under MSDOS, harmless under Unix. */
-  sprintf(pngfilename,"output_%.5d.png",imgnum);
-  pngout = fopen(pngfilename, "wb");
-
-  /* Output the image to the disk file in PNG format. */
-  gdImagePng(im, pngout);
-
-  /* Close the files. */
-  fclose(pngout);
-
-  /* Destroy the image in memory. */
-  gdImageDestroy(im);
-}
- 
