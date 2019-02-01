@@ -25,7 +25,10 @@
 #include <math.h>
 #include <time.h>
 #include <unistd.h>
+#include <tiffio.h>
 
+#define MIN(x,y) ( (x>y) ? (y) : (x) )
+#define MAX(x,y) ( (x<y) ? (y) : (x) )
 
 //setting up the XS matrix
 #define ROWS 4
@@ -34,23 +37,24 @@
 #define PLKL 2 //row 2 for 'PLK-target' level
 #define PP1L 3 //row 3 for PP1 level
 #define QUANTUM 200 //number of columns in the xs matrix
-#define CO 50 //crossover position; TODO need way for multiple COs
-#define PLKMAX 30 //matrix values can be between 0 and this level...start small
+#define CO 30 //crossover position; TODO need way for multiple COs
+#define PLKMAX 4 //matrix values can be between 0 and this level...start small
 #define PP1MAX 30
-#define SYPMAX 30
+#define SYPMAX 10
 #define POOLMAX 1000
 #define INITSYPS 500
 #define KON_BASE 1.0
 
 //triggers for things at a certain run number:
-#define PP1RUN 500
-#define PP1END 5000
-#define PLKRUN 500 //when does PLK-2 start working
-#define PLKEND 10000
-#define PHOSGEN 0.2
+#define TIFFWRITERUN 50
+#define PP1RUN 1000
+#define PP1END 80000
+#define PLKRUN 1000 //when does PLK-2 start working
+#define PLKEND 80000
+#define PHOSGEN 0.3
 #define COPHOSRUN 1000 //when does SYP-1 phos at CO start
-#define COPHOSEND 8850
-#define RUNMAX 10000 //when does program end
+#define COPHOSEND 50000
+#define RUNMAX 100000 //when does program end
 #define MAXPLACETRIES 20 //how many times a SYP tries to get on the SC before giving up
 
 #define rnd ( (0.0 + rand() ) / (RAND_MAX + 1.0) )
@@ -69,6 +73,8 @@ int  syp_place (int xs[ROWS][QUANTUM]);
 int  syp_step (int xs[ROWS][QUANTUM]); 
 float get_stickyprob(int plk);
 float get_offprob(int plk);
+TIFF* open_tiff(); 
+void scaleto8bit(int xs[ROWS][QUANTUM], char Image[ROWS*QUANTUM]);
 
 /************************************************************************
  * Global vars
@@ -97,57 +103,72 @@ int syp_place(int xs[ROWS][QUANTUM]) {
     return(0==successflag); //returns 1 if successfully placed, 0 if unsuccessful
 }
    
-void pp1_step(int xs[ROWS][QUANTUM]) {
-    int li;
-    for (li=0;li<QUANTUM;li++) {
-        xs[PP1L][li]++;
-        xs[PP1L][li]-=(xs[PLKL][li]);
-        if(xs[PP1L][li]>PP1MAX) {
-            xs[PP1L][li]=PP1MAX;
-        }
-        xs[PP1L][li]+=1;
-        if(xs[PP1L][li]>PP1MAX) {
-            xs[PP1L][li]=PP1MAX;
-        }
-        xs[PP1L][li]=3;
-    }
-} 
-
-void plk_step(int xs[ROWS][QUANTUM]) {
-    int li;
-    for (li=0;li<QUANTUM;li++) {
-        xs[PLKL][li]+=xs[SYPP][li];
-        if(xs[PLKL][li]>PLKMAX) {
-            xs[PLKL][li]=PLKMAX;
-        }
-        xs[PLKL][li]-=(xs[PP1L][li]>1);
-        if(xs[PLKL][li]<0) {
-            xs[PLKL][li]=0;
-        }
+void
+pp1_step (int xs[ROWS][QUANTUM])
+{
+  int li;
+  for (li = 0; li < QUANTUM; li++)
+    {
+      if (rnd < .1)
+	{
+	  xs[PP1L][li]++;
+	  xs[PP1L][li] -= (xs[PLKL][li]);
+	  if (xs[PP1L][li] < 0)
+	    {
+	      xs[PP1L][li] = 0;
+	    }
+	  if (xs[PP1L][li] > PP1MAX)
+	    {
+	      xs[PP1L][li] = PP1MAX;
+	    }
+	}
     }
 }
 
-float get_offprob(int plk) {
-return(1.0/(20.0+plk*2));
+void
+plk_step (int xs[ROWS][QUANTUM])
+{
+  int li;
+  for (li = 0; li < QUANTUM; li++)
+    {
+      if (rnd < .5)
+	{
+	  xs[PLKL][li] += xs[SYPP][li];
+	  if (xs[PLKL][li] > PLKMAX)
+	    {
+	      xs[PLKL][li] = PLKMAX;
+	    }
+	  xs[PLKL][li] -= 1;
+	  xs[PLKL][li] -= (xs[PP1L][li]>0);
+	  if (xs[PLKL][li] < 0)
+	    {
+	      xs[PLKL][li] = 0;
+	    }
+	}
+    }
 }
+
 /************************************************************************
  * Main function
  ***********************************************************************/
 int
 main (int argc, char **argv)
 {
-  int nsyps_current = 0;
   int initsyps = INITSYPS;
   int syptotal = 0;
-  int syp_add = 1;
   int li, li2, bound_syps, free_syps, free_reg;
   int xs[ROWS][QUANTUM]; //the chromosome data
   int xsu[ROWS][QUANTUM];//copy of the data for updating
   float prob;
-
+  char xsChar[ROWS*QUANTUM]; //for writing to image
+  tdata_t buf;
+  uint32 row=0;
+  TIFF* tif;
 
   srand (time (NULL));
 
+  
+  tif = open_tiff();
   xs_zero(xs);  //zero out the two XS-containing matrices
   xs_zero(xsu);
 
@@ -171,6 +192,20 @@ main (int argc, char **argv)
         syptotal=syptotal+syp_place(xs); //syp keeps growing throughout prophase
     }
 
+if (run > COPHOSRUN && run < COPHOSEND)
+  {
+      for(li=(-1);li<=1;li++) {
+          li2=CO+li;
+    xs[SYPP][li2] += xs[SYPN][li2];
+    xs[SYPN][li2] = 0;
+    if (xs[SYPP][li2] > SYPMAX)
+      {
+	xs[SYPN][li2] = SYPMAX - xs[SYPN][li2];
+	xs[SYPP][li2] = SYPMAX;
+      }
+  }
+  }
+
       bound_syps = syp_step(xs); //TODO syp_step, sum up all bound syps@end and return
       free_syps = syptotal-bound_syps;
       free_reg = free_syps;
@@ -185,10 +220,16 @@ main (int argc, char **argv)
           }
       }
 
-    writekymorow(xs);
-    }
+    if(0==(run % (TIFFWRITERUN))) {
+    scaleto8bit(xs,xsChar);
+    buf=&xsChar;
+    TIFFWriteScanline(tif, buf, row, 0);
+    row=row+1;
+      }
+  }
 
- return (0);
+TIFFClose (tif);
+return (0);
 }
 
 void writekymorow(int xs[ROWS][QUANTUM]) {
@@ -248,9 +289,14 @@ return(acc);
 }
 
 
+float get_offprob(int plk) {
+    return(0.0001*(1-(plk/PLKMAX)));
+//return(1.0/(20.0+plk*8));
+}
 
 float get_stickyprob(int plk) {
-return(1.0/(2+plk));
+return(0);
+//return(1.0/2*(2+(plk)));
 }
 
 /* zero out an 'xs' matrix */
@@ -260,4 +306,42 @@ for(li=0;li<ROWS;li++) {
 for (li2=0;li2<QUANTUM;li2++) {xs[li][li2]=0;} // initialize chromosome with zeros
 }
 }
+
+TIFF* open_tiff() {
+
+        TIFF* tif = TIFFOpen("/home/pcarlton/rpm.tif", "w");
+        TIFFSetField (tif, TIFFTAG_BITSPERSAMPLE, 8);
+	TIFFSetField (tif, TIFFTAG_ARTIST, "Pete Carlton");
+	TIFFSetField (tif, TIFFTAG_IMAGELENGTH, RUNMAX/TIFFWRITERUN);
+	TIFFSetField (tif, TIFFTAG_IMAGEWIDTH, QUANTUM*ROWS);
+	TIFFSetField (tif, TIFFTAG_IMAGEDEPTH, 1);
+	TIFFSetField (tif, TIFFTAG_PLANARCONFIG, 1);	
+	TIFFSetField (tif, TIFFTAG_PHOTOMETRIC, 1);
+        return(tif);
+}
+	
+
+		           
+void scaleto8bit(int xs[ROWS][QUANTUM], char Image[ROWS*QUANTUM])
+{
+int x,y,li=0;
+float scl;
+const int rowscl[4]={SYPMAX,SYPMAX,PLKMAX,PP1MAX};
+/*double correction;*/
+/*max -= min;*/
+/*correction = 255 / max;*/
+
+for (x=0;x<ROWS;x++) {
+scl=255.0 / rowscl[x];
+for (y=0;y<QUANTUM;y++) {
+Image[li] = (char)(scl*xs[x][y]); li++;
+}
+}
+Image[0]=255;
+Image[1*QUANTUM]=255;
+Image[2*QUANTUM]=255;
+Image[3*QUANTUM]=255;
+Image[4*QUANTUM-1]=255;
+}
+
 
