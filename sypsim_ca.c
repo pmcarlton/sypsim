@@ -309,7 +309,7 @@ for (li2=0;li2<QUANTUM;li2++) {xs[li][li2]=0;} // initialize chromosome with zer
 
 TIFF* open_tiff() {
 
-        TIFF* tif = TIFFOpen("/home/pcarlton/rpm.tif", "w");
+        TIFF* tif = TIFFOpen("rpm.tif", "w");
         TIFFSetField (tif, TIFFTAG_BITSPERSAMPLE, 8);
 	TIFFSetField (tif, TIFFTAG_ARTIST, "Pete Carlton");
 	TIFFSetField (tif, TIFFTAG_IMAGELENGTH, RUNMAX/TIFFWRITERUN);
@@ -337,11 +337,11 @@ for (y=0;y<QUANTUM;y++) {
 Image[li] = (char)(scl*xs[x][y]); li++;
 }
 }
-Image[0]=255;
-Image[1*QUANTUM]=255;
-Image[2*QUANTUM]=255;
-Image[3*QUANTUM]=255;
-Image[4*QUANTUM-1]=255;
+Image[0]=(char)255;
+Image[1*QUANTUM]=(char)255;
+Image[2*QUANTUM]=(char)255;
+Image[3*QUANTUM]=(char)255;
+Image[4*QUANTUM-1]=(char)255;
 }
 
 
