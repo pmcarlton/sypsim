@@ -38,11 +38,11 @@
 #define PP1L 3 //row 3 for PP1 level
 #define QUANTUM 200 //number of columns in the xs matrix
 #define CO 30 //crossover position; TODO need way for multiple COs
-#define PLKMAX 4 //matrix values can be between 0 and this level...start small
-#define PP1MAX 30
-#define SYPMAX 10
-#define POOLMAX 1000
-#define INITSYPS 500
+#define PLKMAX 3 //matrix values can be between 0 and this level...start small
+#define PP1MAX 3
+#define SYPMAX 4
+#define POOLMAX 600
+#define INITSYPS 300
 #define KON_BASE 1.0
 
 //triggers for things at a certain run number:
@@ -109,7 +109,7 @@ pp1_step (int xs[ROWS][QUANTUM])
   int li;
   for (li = 0; li < QUANTUM; li++)
     {
-      if (rnd < .1)
+      if (rnd < .001) /*crap*/
 	{
 	  xs[PP1L][li]++;
 	  xs[PP1L][li] -= (xs[PLKL][li]);
@@ -290,12 +290,12 @@ return(acc);
 
 
 float get_offprob(int plk) {
-    return(0.0001*(1-(plk/PLKMAX)));
+    return(0.001*(plk==0));
 //return(1.0/(20.0+plk*8));
 }
 
 float get_stickyprob(int plk) {
-return(0);
+return(0.00);
 //return(1.0/2*(2+(plk)));
 }
 
