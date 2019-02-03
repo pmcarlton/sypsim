@@ -37,7 +37,7 @@
 #define PLKL 2 //row 2 for 'PLK-target' level
 #define PP1L 3 //row 3 for PP1 level
 #define QUANTUM 200 //number of columns in the xs matrix
-#define CO 105 //crossover position; TODO need way for multiple COs
+#define CO 100 //crossover position; TODO need way for multiple COs
 #define PLKMAX 3 //matrix values can be between 0 and this level...start small
 #define PP1MAX 3
 #define SYPMAX 4
