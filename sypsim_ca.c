@@ -37,7 +37,7 @@
 #define PLKL 2 //row 2 for 'PLK-target' level
 #define PP1L 3 //row 3 for PP1 level
 #define QUANTUM 200 //number of columns in the xs matrix
-#define CO 60 //crossover position; TODO need way for multiple COs
+#define CO 105 //crossover position; TODO need way for multiple COs
 #define PLKMAX 3 //matrix values can be between 0 and this level...start small
 #define PP1MAX 3
 #define SYPMAX 4
@@ -52,7 +52,7 @@
 #define PLKRUN 1000 //when does PLK-2 start working
 #define PLKEND 80000
 #define PHOSGEN 0.3
-#define COPHOSRUN 1000 //when does SYP-1 phos at CO start
+#define COPHOSRUN 10000 //when does SYP-1 phos at CO start
 #define COPHOSEND 50000
 #define RUNMAX 100000 //when does program end
 #define MAXPLACETRIES 20 //how many times a SYP tries to get on the SC before giving up
