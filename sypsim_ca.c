@@ -37,7 +37,7 @@
 #define PLKL 2 //row 2 for 'PLK-target' level
 #define PP1L 3 //row 3 for PP1 level
 #define QUANTUM 200 //number of columns in the xs matrix
-#define CO 10 //crossover position; TODO need way for multiple COs
+#define CO 60 //crossover position; TODO need way for multiple COs
 #define PLKMAX 3 //matrix values can be between 0 and this level...start small
 #define PP1MAX 3
 #define SYPMAX 4
@@ -60,7 +60,7 @@
 #define rnd ( (0.0 + rand() ) / (RAND_MAX + 1.0) )
 
 #define PPPROB 0.001
-#define PLKPROB 0.1
+#define PLKPROB 0.01
 
 /************************************************************************
  * Internal function declarations
@@ -74,9 +74,9 @@ void pp1_step  (int xs[ROWS][QUANTUM]);
 int  syp_place (int xs[ROWS][QUANTUM]); 
 int  syp_step (int xs[ROWS][QUANTUM]); 
 float get_stickyprob(int plk);
-float get_offprob(int plk);
+float get_offprob(int r, int plk);
 TIFF* open_tiff(); 
-void scaleto8bit(int xs[ROWS][QUANTUM], char Image[ROWS*QUANTUM]);
+void scaleto8bit(int xs[ROWS][QUANTUM], char Image[(1+ROWS)*QUANTUM]);
 
 /************************************************************************
  * Global vars
@@ -162,7 +162,7 @@ main (int argc, char **argv)
   int xs[ROWS][QUANTUM]; //the chromosome data
   int xsu[ROWS][QUANTUM];//copy of the data for updating
   float prob;
-  char xsChar[ROWS*QUANTUM]; //for writing to image
+  char xsChar[(1+ROWS)*QUANTUM]; //for writing to image
   tdata_t buf;
   uint32 row=0;
   TIFF* tif;
@@ -257,7 +257,7 @@ for (li=0;li<QUANTUM;li++) {
     syp=xs[r][li];
     if(syp) { 
         for (i=0;i<syp;i++) {
-            off=get_offprob(xs[PLKL][li]);
+            off=get_offprob(r,xs[PLKL][li]);
             stay=1-off;
             sticky=stay*get_stickyprob(xs[PLKL][li]);
             lateral=(stay-sticky);
@@ -291,8 +291,9 @@ return(acc);
 }
 
 
-float get_offprob(int plk) {
-    return(0.001*(plk==0));
+float get_offprob(int nonphos, int plk) {
+    if(nonphos) return(0.001*(plk));
+    else return(.001*(plk==0));
 //return(1.0/(20.0+plk*8));
 }
 
@@ -315,7 +316,7 @@ TIFF* open_tiff() {
         TIFFSetField (tif, TIFFTAG_BITSPERSAMPLE, 8);
 	TIFFSetField (tif, TIFFTAG_ARTIST, "Pete Carlton");
 	TIFFSetField (tif, TIFFTAG_IMAGELENGTH, RUNMAX/TIFFWRITERUN);
-	TIFFSetField (tif, TIFFTAG_IMAGEWIDTH, QUANTUM*ROWS);
+	TIFFSetField (tif, TIFFTAG_IMAGEWIDTH, QUANTUM*(1+ROWS));
 	TIFFSetField (tif, TIFFTAG_IMAGEDEPTH, 1);
 	TIFFSetField (tif, TIFFTAG_PLANARCONFIG, 1);	
 	TIFFSetField (tif, TIFFTAG_PHOTOMETRIC, 1);
@@ -324,7 +325,7 @@ TIFF* open_tiff() {
 	
 
 		           
-void scaleto8bit(int xs[ROWS][QUANTUM], char Image[ROWS*QUANTUM])
+void scaleto8bit(int xs[ROWS][QUANTUM], char Image[(1+ROWS)*QUANTUM])
 {
 int x,y,li=0;
 float scl;
@@ -339,11 +340,16 @@ for (y=0;y<QUANTUM;y++) {
 Image[li] = (char)(scl*xs[x][y]); li++;
 }
 }
+scl=255.0/rowscl[0];
+for(y=0;y<QUANTUM;y++) {
+    Image[li] = (char)(scl*(xs[0][y]+xs[1][y])); li++;
+}
 Image[0]=(char)255;
 Image[1*QUANTUM]=(char)255;
 Image[2*QUANTUM]=(char)255;
 Image[3*QUANTUM]=(char)255;
-Image[4*QUANTUM-1]=(char)255;
+Image[4*QUANTUM]=(char)255;
+Image[5*QUANTUM-1]=(char)255;
 }
 
 
