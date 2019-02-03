@@ -37,7 +37,7 @@
 #define PLKL 2 //row 2 for 'PLK-target' level
 #define PP1L 3 //row 3 for PP1 level
 #define QUANTUM 200 //number of columns in the xs matrix
-#define CO 70 //crossover position; TODO need way for multiple COs
+#define CO 10 //crossover position; TODO need way for multiple COs
 #define PLKMAX 3 //matrix values can be between 0 and this level...start small
 #define PP1MAX 3
 #define SYPMAX 4
@@ -59,6 +59,8 @@
 
 #define rnd ( (0.0 + rand() ) / (RAND_MAX + 1.0) )
 
+#define PPPROB 0.001
+#define PLKPROB 0.1
 
 /************************************************************************
  * Internal function declarations
@@ -109,7 +111,7 @@ pp1_step (int xs[ROWS][QUANTUM])
   int li;
   for (li = 0; li < QUANTUM; li++)
     {
-      if (rnd < .001) /*crap*/
+      if (rnd < PPPROB) 
 	{
 	  xs[PP1L][li]++;
       }
@@ -131,7 +133,7 @@ plk_step (int xs[ROWS][QUANTUM])
   int li;
   for (li = 0; li < QUANTUM; li++)
     {
-      if (rnd < .5)
+      if (rnd < PLKPROB)
 	{
 	  xs[PLKL][li] += xs[SYPP][li];
 	  if (xs[PLKL][li] > PLKMAX)
